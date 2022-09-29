@@ -1,0 +1,94 @@
+title: "R Notebook"
+output: html_notebook
+---
+
+# Notebook associated with analysis for CHI '22 paper 
+# "I Don't Even Remember What I Read": How Design Influences
+# Dissociation on Social Media
+# By Amanda Baughan, Mingrui "Ray" Zhang, Raveena Rao, 
+# Kai Lukoff, Anastasia Schaadhardt, Lisa Butler, and Alexis Hiniker
+# https://doi.org/10.1145/3491102.3501899
+
+## Read in dependencies, data, correct data types, etc. 
+```{r echo=FALSE}
+#If any of these do not load, try install.packages("lme4") (etc.), then try again
+library(lme4)
+library(lmerTest)
+library(car)
+library(emmeans)
+library(multcomp)
+library(coin)
+library(zoo)
+library(scales)
+library(effectsize)
+
+calculateBetas <- function(model){
+    Vcov <- vcov(model, useScale = False)
+    betas <- round(fixef(model), 3)#lmer
+    se <- round(sqrt(diag(Vcov)), 3)
+    zval <- round(betas / se, 3)
+    pval <- round(2*pnorm(abs(zval), lower.tail = FALSE), 3)
+    ## print everything
+    cbind(betas, se, zval, pval)
+}
+```
+
+```{r}
+ldf <- read.csv("logs.csv")
+#Set correct data types
+ldf$pid <- as.factor(ldf$pid)
+ldf$date <- as.factor(ldf$date)
+
+length(unique(ldf$pid)) # number of participants
+length(unique(ldf[ldf$avgAttentionScore > 3,]$pid)) # number of participants who experienced normative dissociation
+length(ldf[ldf$avgAttentionScore > 3,]$avgAttentionScore) # instances of normative dissociation
+```
+
+# Internal interventions
+## Read data and correct data types
+```{r}
+vtdf <- read.csv("views.csv")
+vtdf$pid <- as.factor(vtdf$pid) #Participant ID
+vtdf$date <- as.factor(vtdf$date) #Date recorded
+vtdf$feedname_general <- as.factor(vtdf$feedname_general) #List or home feed
+vtdf$internal <- as.factor(vtdf$internal) #Internal interventions on/off
+vtdf$scrolledIntoOld <- as.factor(vtdf$scrolledIntoOld) #Scrolled into history yes/no
+```
+
+# Run an inverse gaussian model in which the "avgAttentionScore" (Dissociation score)
+# is modeled by whether the feed is a list or home feed and the number of hours spent on it
+# with the participant ID and the date as random variables
+```{r}
+vt.ig <- glmer(formula = avgAttentionScore ~ feedname_general + fthrs + (1|pid) + (1|date), family = inverse.gaussian(link = "log"), data =vtdf)
+summary(vt.ig)
+# Anova(vt.ig, type = "3")
+```
+
+# Run an inverse gaussian model in which dissociaiton is modeled as 
+# the interaction of whether the reading history label would be shown at all (internal interventions on/off)
+# and whether the participant scrolled into their old tweets, signaling that the
+# reading history label has been seen
+# PID and date are random variables
+```{r}
+rh.ig <- glmer(formula = avgAttentionScore ~ internal*scrolledIntoOld + (1|pid) + (1|date), family = inverse.gaussian(link = "log"), data =vtdf)
+summary(rh.ig)
+# Anova(rh.ig, type = "3")
+```
+
+```{r}
+summary(glht(rh.ig, emm(pairwise ~ internal*scrolledIntoOld)), test=adjusted(type="holm"))
+# 0, no reading history shown; 1, reading history is shown
+# no, they do not scroll into previously read tweets; yes, they do scroll into previously read tweets
+```
+
+# External Interventions
+# Model dissociation as part of total hours on Chirp, whether they used the time limit dialog to exit Chirp,
+# whether they ignored the time limit dialog (dialogIgnore), and how many times they viewed usage stats
+# pid and date are random variables
+```{r}
+m.ig <- glmer(formula = avgAttentionScore ~ consumetimeHours + dialogExit+dialogIgnore + statPageView + (1|pid) + (1|date), family = inverse.gaussian(link = "log"), data = ldf)
+summary(m.ig)
+# calculateBetas(m.ig)
+# Anova(m.ig, type = "3")
+```
+
