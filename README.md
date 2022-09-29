@@ -3,6 +3,9 @@
 ### Contents
 This repository contains the interview script we used, the Dissociative Processes Scale we adapted to create our ESM question, and our data and R notebook for quantitative analysis.
 
+### Read the paper
+https://doi.org/10.1145/3491102.3501899 (open access)
+
 ### Cite the paper
 
     @inproceedings{baughan2022dissociation,
